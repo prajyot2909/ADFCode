@@ -1,0 +1,158 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "For_each_item_in_List_of_File_Names": {
+                "actions": {
+                    "Parse_JSON": {
+                        "inputs": {
+                            "content": "@items('For_each_item_in_List_of_File_Names')",
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "type": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "runAfter": {},
+                        "type": "ParseJson"
+                    },
+                    "Set_blob_tier_by_path": {
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azureblob_2']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "path": "/datasets/default/SetBlobTierByPath",
+                            "queries": {
+                                "newTier": "Archive",
+                                "path": "@{variables('TargetContainer')}@{variables('FolderPath')}/@{body('Parse_JSON')?['name']}"
+                            }
+                        },
+                        "runAfter": {
+                            "Parse_JSON": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection"
+                    }
+                },
+                "foreach": "@variables('List_File_Names')",
+                "runAfter": {
+                    "Initialize_variable_List_File_Names__using_request_body": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Foreach"
+            },
+            "Initialize_variable_FolderPath_using_request_headers": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "FolderPath",
+                            "type": "string",
+                            "value": "@{triggerOutputs()?['headers']?['FolderPath']}"
+                        }
+                    ]
+                },
+                "runAfter": {},
+                "type": "InitializeVariable"
+            },
+            "Initialize_variable_List_File_Names__using_request_body": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "List_File_Names",
+                            "type": "array",
+                            "value": "@triggerBody()"
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Initialize_variable_TargetContainer_using_request_header": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "Initialize_variable_TargetContainer_using_request_header": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "TargetContainer",
+                            "type": "string",
+                            "value": "@{triggerOutputs()?['headers']?['Target_Container_Name']}"
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Initialize_variable_FolderPath_using_request_headers": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "Response_200:_For_successfull_completion_of_Foreach": {
+                "inputs": {
+                    "statusCode": 200
+                },
+                "kind": "Http",
+                "runAfter": {
+                    "For_each_item_in_List_of_File_Names": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Response"
+            },
+            "Response_400:_For_erros_during_execution_of_ForEach": {
+                "inputs": {
+                    "body": "Failed to set the Access Tier to Archive for @{variables('FolderPath')}",
+                    "statusCode": 400
+                },
+                "kind": "Http",
+                "runAfter": {
+                    "For_each_item_in_List_of_File_Names": [
+                        "Failed"
+                    ]
+                },
+                "type": "Response"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            }
+        },
+        "triggers": {
+            "manual": {
+                "inputs": {
+                    "method": "POST",
+                    "schema": {}
+                },
+                "kind": "Http",
+                "type": "Request"
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "value": {
+                "azureblob_2": {
+                    "connectionId": "/subscriptions/9ae9cf58-0498-42ff-8666-95badd20b8cd/resourceGroups/AZRG-USE2-CON-030009-NPD/providers/Microsoft.Web/connections/azureblob",
+                    "connectionName": "azureblob",
+                    "id": "/subscriptions/9ae9cf58-0498-42ff-8666-95badd20b8cd/providers/Microsoft.Web/locations/eastus2/managedApis/azureblob"
+                }
+            }
+        }
+    }
+}
